@@ -181,8 +181,9 @@ format_partitions() {
 mount_system() {
     echo "Mounting filesystems..."
     mount /dev/SysVG/root /mnt
-    mkdir -p /mnt/boot{,/efi}
+    mkdir -p /mnt/boot
     mount "$BOOT_PART" /mnt/boot
+    mkdir -p /mnt/boot/efi
     mount "$EFI_PART" /mnt/boot/efi
     
     if [[ "$CREATE_HOME" == true ]]; then
