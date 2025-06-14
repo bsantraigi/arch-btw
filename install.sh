@@ -115,6 +115,16 @@ create_partitions() {
         LVM_PART="${DISK}p3"
         [[ "$TIMESHIFT_PART" ]] && TIMESHIFT_PART="${DISK}p4"
     fi
+
+    # Echo summary
+    echo "Partitions created:"
+    echo "  EFI: $EFI_PART"
+    echo "  Boot: $BOOT_PART"
+    echo "  LVM: $LVM_PART"
+    [[ "$TIMESHIFT_PART" ]] && echo "  Timeshift: $TIMESHIFT_PART"
+    echo "  Swap: $SWAP_SIZE"
+    echo "  Root: $ROOT_SIZE"
+    [[ "$CREATE_HOME" == true ]] && echo "  Home: 100%FREE"
     
     sleep 2  # Let kernel recognize partitions
 }
