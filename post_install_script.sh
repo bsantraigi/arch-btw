@@ -3,8 +3,10 @@ set -e
 
 # Desktop environments
 declare -A desktops=(
-    [1]="GNOME (full)"
-    [2]="KDE Plasma (full)"
+    [1]="GNOME (minimal + essentials)"
+    [2]="KDE Plasma (minimal + essentials)"
+    [3]="GNOME (full)"
+    [4]="KDE Plasma (full)"
     [skip]="Skip desktop installation"
 )
 
@@ -17,9 +19,9 @@ print_desktops() {
 
 get_desktop_choice() {
     print_desktops
-    read -p "Choose desktop [1/2/skip]: " DESKTOP_CHOICE
+    read -p "Choose desktop [1/2/3/4/skip]: " DESKTOP_CHOICE
     
-    if [[ "$DESKTOP_CHOICE" != "1" && "$DESKTOP_CHOICE" != "2" && "$DESKTOP_CHOICE" != "skip" ]]; then
+    if [[ ! "$DESKTOP_CHOICE" =~ ^[1-4]$|^skip$ ]]; then
         echo "Invalid choice"
         exit 1
     fi
@@ -127,8 +129,38 @@ install_aur_packages() {
     fi
 }
 
-install_gnome() {
-    echo "Installing GNOME desktop..."
+install_gnome_minimal() {
+    echo "Installing GNOME minimal + essentials..."
+    
+    # Core GNOME
+    pacman -S --noconfirm \
+        gnome-shell gdm gnome-control-center gnome-tweaks \
+        nautilus gnome-terminal gnome-system-monitor \
+        gnome-calculator gnome-screenshot gnome-disk-utility \
+        file-roller evince eog gnome-text-editor \
+        gnome-settings-daemon gnome-session
+    
+    systemctl enable gdm
+    echo "GNOME minimal installed"
+}
+
+install_kde_minimal() {
+    echo "Installing KDE Plasma minimal + essentials..."
+    
+    # Core Plasma
+    pacman -S --noconfirm \
+        plasma-desktop plasma-workspace sddm \
+        dolphin konsole kate spectacle \
+        ark okular gwenview kcalc \
+        plasma-systemmonitor plasma-nm \
+        powerdevil bluedevil
+    
+    systemctl enable sddm
+    echo "KDE Plasma minimal installed"
+}
+
+install_gnome_full() {
+    echo "Installing GNOME full desktop..."
     
     pacman -S --noconfirm \
         gnome gnome-extra gdm \
@@ -136,11 +168,11 @@ install_gnome() {
         file-roller evince
     
     systemctl enable gdm
-    echo "GNOME installed"
+    echo "GNOME full installed"
 }
 
-install_kde() {
-    echo "Installing KDE Plasma desktop..."
+install_kde_full() {
+    echo "Installing KDE Plasma full desktop..."
     
     pacman -S --noconfirm \
         plasma-meta kde-applications-meta sddm \
@@ -148,16 +180,22 @@ install_kde() {
         okular spectacle ark
     
     systemctl enable sddm
-    echo "KDE Plasma installed"
+    echo "KDE Plasma full installed"
 }
 
 install_desktop() {
     case "$DESKTOP_CHOICE" in
         "1")
-            install_gnome
+            install_gnome_minimal
             ;;
         "2")
-            install_kde
+            install_kde_minimal
+            ;;
+        "3")
+            install_gnome_full
+            ;;
+        "4")
+            install_kde_full
             ;;
         "skip")
             echo "Skipping desktop installation"
