@@ -43,6 +43,9 @@ get_user_input() {
     echo
     read -s -p "User password: " USER_PASS
     echo
+    
+    # Ask about post-install setup
+    read -p "Run post-install setup (desktop/fonts/locale)? [y/n]: " RUN_POSTINSTALL
 }
 
 wipe_disk() {
@@ -205,6 +208,22 @@ install_base() {
     genfstab -U /mnt >> /mnt/etc/fstab
 }
 
+copy_postinstall_script() {
+    if [[ "$RUN_POSTINSTALL" == "y" ]]; then
+        echo "Copying post-install script..."
+        
+        # Download or copy post-install script
+        if [[ -f "post-install.sh" ]]; then
+            cp post-install.sh /mnt/root/
+        else
+            echo "Warning: post-install.sh not found in current directory"
+            echo "You can run it manually after installation"
+        fi
+        
+        chmod +x /mnt/root/post-install.sh 2>/dev/null || true
+    fi
+}
+
 configure_system() {
     echo "Configuring system..."
     
@@ -256,11 +275,17 @@ grub-mkconfig -o /boot/grub/grub.cfg
 # Enable services
 systemctl enable NetworkManager
 
+# Run post-install if requested
+if [[ "$4" == "y" && -f /root/post-install.sh ]]; then
+    echo "Running post-install setup..."
+    /root/post-install.sh
+fi
+
 echo "Configuration complete!"
 EOF
 
     chmod +x /mnt/root/configure.sh
-    arch-chroot /mnt /root/configure.sh "$USERNAME" "$USER_PASS" "$LUKS_UUID"
+    arch-chroot /mnt /root/configure.sh "$USERNAME" "$USER_PASS" "$LUKS_UUID" "$RUN_POSTINSTALL"
     rm /mnt/root/configure.sh
 }
 
@@ -279,11 +304,18 @@ main() {
     format_partitions
     mount_system
     install_base
+    copy_postinstall_script
     configure_system
     cleanup
     
     echo "Installation complete! Remove installation media and reboot."
     echo "Login as: $USERNAME"
+    
+    if [[ "$RUN_POSTINSTALL" == "y" ]]; then
+        echo "Post-install setup was run during installation."
+    else
+        echo "To set up desktop environment later, run: sudo /root/post-install.sh"
+    fi
 }
 
 # Trap cleanup on exit
