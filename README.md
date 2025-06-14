@@ -8,7 +8,11 @@ Download and run the script from the Arch Linux live environment:
 
 ```bash
 curl -LO https://github.com/bsantraigi/arch-btw/raw/main/install.sh
-./install.sh
+bash install.sh
+
+# or (for debugging)
+
+bash -x install.sh
 ```
 
 ## Features

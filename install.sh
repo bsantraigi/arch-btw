@@ -162,8 +162,20 @@ format_partitions() {
     mkfs.ext4 -F /dev/SysVG/root
     mkswap /dev/SysVG/swap
     
-    [[ "$CREATE_HOME" == true ]] && mkfs.ext4 -F /dev/SysVG/home
-    [[ "$TIMESHIFT_PART" ]] && mkfs.ext4 -F "$TIMESHIFT_PART"
+    # [[ "$CREATE_HOME" == true ]] && mkfs.ext4 -F /dev/SysVG/home
+    if [[ "$CREATE_HOME" == true ]]; then
+        mkdir -p /mnt/home
+        if ! mount /dev/SysVG/home /mnt/home; then
+            echo "Failed to mount home partition, but continuing..."
+        fi
+    fi
+    # [[ "$TIMESHIFT_PART" ]] && mkfs.ext4 -F "$TIMESHIFT_PART"
+    if [[ "$TIMESHIFT_PART" ]]; then
+        mkdir -p /mnt/run/timeshift/backup
+        if ! mount "$TIMESHIFT_PART" /mnt/run/timeshift/backup; then
+            echo "Failed to mount timeshift partition, but continuing..."
+        fi
+    fi
 }
 
 mount_system() {
