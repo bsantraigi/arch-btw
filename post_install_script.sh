@@ -52,6 +52,15 @@ setup_keyboard() {
     localectl set-x11-keymap us
 }
 
+install_essential_packages() {
+    echo "Installing essential packages..."
+    
+    # Core development and utilities
+    pacman -S --noconfirm \
+        base-devel git nano vim kitty terminator \
+        transmission-gtk qbittorrent
+}
+
 install_fonts() {
     echo "Installing comprehensive font packages..."
     
@@ -65,39 +74,57 @@ install_fonts() {
         noto-fonts-cjk noto-fonts-extra \
         ttf-indic-otf ttf-tibetan-machine
     
-    # MS fonts equivalent
-    if ! pacman -Qi ttf-ms-fonts &>/dev/null; then
-        echo "Installing MS fonts from AUR..."
-        install_aur_package ttf-ms-fonts
-    fi
+    # AUR fonts
+    echo "Installing AUR font packages..."
+    install_aur_packages ttf-ms-fonts
 }
 
-install_aur_package() {
-    local package="$1"
-    local temp_dir="/tmp/aur_$package"
+install_aur_applications() {
+    echo "Installing AUR applications..."
+    install_aur_packages joplin-appimage microsoft-edge-stable-bin
+    install_aur_packages visual-studio-code-bin
+    install_aur_packages google-chrome brave-bin
+}
+
+install_yay() {
+    if command -v yay &>/dev/null; then
+        echo "yay already installed"
+        return
+    fi
     
-    # Create temporary user for AUR if running as root
+    echo "Installing yay AUR helper..."
+    
+    # Create build user if running as root
     if [[ $EUID -eq 0 ]]; then
-        if ! id -u auruser &>/dev/null; then
-            useradd -r -s /bin/bash auruser
-            mkdir -p /home/auruser
-            chown auruser:auruser /home/auruser
+        if ! id -u builduser &>/dev/null; then
+            useradd -r -m -s /bin/bash builduser
+            echo "builduser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
         fi
         
-        sudo -u auruser bash << EOF
+        sudo -u builduser bash << 'EOF'
 cd /tmp
-git clone https://aur.archlinux.org/$package.git $temp_dir
-cd $temp_dir
+git clone https://aur.archlinux.org/yay.git
+cd yay
 makepkg -si --noconfirm
 EOF
     else
         cd /tmp
-        git clone https://aur.archlinux.org/$package.git $temp_dir
-        cd $temp_dir
+        git clone https://aur.archlinux.org/yay.git
+        cd yay
         makepkg -si --noconfirm
     fi
     
-    rm -rf $temp_dir
+    rm -rf /tmp/yay
+}
+
+install_aur_packages() {
+    local packages=("$@")
+    
+    if [[ $EUID -eq 0 ]]; then
+        sudo -u builduser yay -S --noconfirm "${packages[@]}"
+    else
+        yay -S --noconfirm "${packages[@]}"
+    fi
 }
 
 install_gnome() {
@@ -157,6 +184,7 @@ main() {
     
     get_desktop_choice
     update_system
+    install_yay
     setup_locale
     
     # Skip hardware-specific configs in chroot
@@ -165,7 +193,9 @@ main() {
         setup_keyboard
     fi
     
+    install_essential_packages
     install_fonts
+    install_aur_applications
     install_desktop
     
     echo "Post-install setup complete!"
