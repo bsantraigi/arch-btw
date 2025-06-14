@@ -2,6 +2,15 @@
 
 An automated Arch Linux installer with LUKS on LVM setup.
 
+## Quick Start
+
+Download and run the script from the Arch Linux live environment:
+
+```bash
+curl -LO https://github.com/bsantraigi/arch-btw/raw/main/install.sh
+./install.sh
+```
+
 ## Features
 
 - Automated end-to-end Arch Linux installation
@@ -9,14 +18,6 @@ An automated Arch Linux installer with LUKS on LVM setup.
 - Configurable partition schemes for different disk sizes
 - Timeshift integration for system backups (except for compact scheme)
 - Works on both VMs and bare metal
-
-## Quick Start
-
-Download and run the script from the Arch Linux live environment:
-
-```bash
-curl -sL https://github.com/bsantraigi/arch-btw/raw/main/install.sh | bash
-```
 
 # Partition Schemes
 

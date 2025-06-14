@@ -3,24 +3,24 @@ set -e
 
 # Partition schemes
 declare -A schemes=(
-    ["compact"]="60-100GB: 8GB swap, 40GB root, rest home (no timeshift)"
-    ["standard"]="512GB: 16GB swap, 150GB root, 200GB home, 180GB timeshift"
-    ["massive"]="1TB+: 16GB swap, 200GB root, rest split home/timeshift"
+    [1]="compact: 60-100GB, 8GB swap, rest root (no /home, no timeshift)"
+    [2]="standard: 512GB, 16GB swap, 150GB root, 200GB home, 180GB timeshift"
+    [3]="massive: 1TB+, 16GB swap, 200GB root, rest split home/timeshift"
 )
 
 print_schemes() {
     echo "Available partition schemes:"
     for key in "${!schemes[@]}"; do
-        echo "  $key: ${schemes[$key]}"
+        echo "  $key) ${schemes[$key]}"
     done
 }
 
 get_user_input() {
     echo "=== Arch Linux Auto-Install ==="
     
-    # Show available disks
+    # Show available disks with details
     echo "Available disks:"
-    lsblk -d -o NAME,SIZE,MODEL | grep -E "sd|nvme|vd"
+    lsblk -d -o NAME,SIZE,MODEL,VENDOR,SERIAL | grep -E "sd|nvme|vd"
     
     read -p "Target disk (e.g., sda, nvme0n1): " DISK
     DISK="/dev/$DISK"
@@ -31,7 +31,7 @@ get_user_input() {
     fi
     
     print_schemes
-    read -p "Partition scheme [compact/standard/massive]: " SCHEME
+    read -p "Partition scheme [1/2/3]: " SCHEME
     
     if [[ ! "${schemes[$SCHEME]}" ]]; then
         echo "Invalid scheme"
@@ -59,8 +59,8 @@ create_partitions() {
     DISK_GB=$((DISK_SIZE / 1024 / 1024 / 1024))
     
     case "$SCHEME" in
-        "compact")
-            # EFI: 1GB, Boot: 5GB, LVM: rest
+        "1")
+            # Compact: EFI: 1GB, Boot: 5GB, LVM: rest (no separate /home)
             parted -s "$DISK" mklabel gpt
             parted -s "$DISK" mkpart primary fat32 1MiB 1025MiB    # EFI
             parted -s "$DISK" set 1 esp on
@@ -68,11 +68,12 @@ create_partitions() {
             parted -s "$DISK" mkpart primary 6145MiB 100%         # LVM
             
             SWAP_SIZE="8G"
-            ROOT_SIZE="40G"
+            ROOT_SIZE="100%FREE"  # Use all remaining space
+            CREATE_HOME=false
             TIMESHIFT_PART=""
             ;;
-        "standard")
-            # EFI: 1GB, Boot: 5GB, LVM: ~330GB, Timeshift: rest
+        "2")
+            # Standard: EFI: 1GB, Boot: 5GB, LVM: ~330GB, Timeshift: rest
             parted -s "$DISK" mklabel gpt
             parted -s "$DISK" mkpart primary fat32 1MiB 1025MiB
             parted -s "$DISK" set 1 esp on
@@ -82,10 +83,11 @@ create_partitions() {
             
             SWAP_SIZE="16G"
             ROOT_SIZE="150G"
+            CREATE_HOME=true
             TIMESHIFT_PART="${DISK}4"
             ;;
-        "massive")
-            # EFI: 1GB, Boot: 5GB, LVM: 70%, Timeshift: 30%
+        "3")
+            # Massive: EFI: 1GB, Boot: 5GB, LVM: 70%, Timeshift: 30%
             LVM_END=$((DISK_GB * 70 / 100 + 6))
             parted -s "$DISK" mklabel gpt
             parted -s "$DISK" mkpart primary fat32 1MiB 1025MiB
@@ -96,6 +98,7 @@ create_partitions() {
             
             SWAP_SIZE="16G"
             ROOT_SIZE="200G"
+            CREATE_HOME=true
             TIMESHIFT_PART="${DISK}4"
             ;;
     esac
@@ -128,11 +131,18 @@ setup_lvm() {
     vgcreate SysVG /dev/mapper/cryptlvm
     
     lvcreate -L "$SWAP_SIZE" SysVG -n swap
-    lvcreate -L "$ROOT_SIZE" SysVG -n root
-    lvcreate -l 100%FREE SysVG -n home
     
-    # Leave some space for fsck
-    lvresize -L -512M /dev/SysVG/home
+    if [[ "$CREATE_HOME" == true ]]; then
+        lvcreate -L "$ROOT_SIZE" SysVG -n root
+        lvcreate -l 100%FREE SysVG -n home
+        # Leave some space for fsck
+        lvresize -L -512M /dev/SysVG/home
+    else
+        # Compact scheme: only root partition
+        lvcreate -l 100%FREE SysVG -n root
+        # Leave some space for fsck
+        lvresize -L -512M /dev/SysVG/root
+    fi
 }
 
 format_partitions() {
@@ -140,19 +150,24 @@ format_partitions() {
     mkfs.fat -F32 "$EFI_PART"
     mkfs.ext4 -F "$BOOT_PART"
     mkfs.ext4 -F /dev/SysVG/root
-    mkfs.ext4 -F /dev/SysVG/home
     mkswap /dev/SysVG/swap
     
+    [[ "$CREATE_HOME" == true ]] && mkfs.ext4 -F /dev/SysVG/home
     [[ "$TIMESHIFT_PART" ]] && mkfs.ext4 -F "$TIMESHIFT_PART"
 }
 
 mount_system() {
     echo "Mounting filesystems..."
     mount /dev/SysVG/root /mnt
-    mkdir -p /mnt/{boot,boot/efi,home}
+    mkdir -p /mnt/boot{,/efi}
     mount "$BOOT_PART" /mnt/boot
     mount "$EFI_PART" /mnt/boot/efi
-    mount /dev/SysVG/home /mnt/home
+    
+    if [[ "$CREATE_HOME" == true ]]; then
+        mkdir -p /mnt/home
+        mount /dev/SysVG/home /mnt/home
+    fi
+    
     swapon /dev/SysVG/swap
     
     if [[ "$TIMESHIFT_PART" ]]; then
