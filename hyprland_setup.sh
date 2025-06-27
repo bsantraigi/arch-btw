@@ -58,7 +58,8 @@ install_hyprland_core() {
         ${hypr_components[auth]} ${hypr_components[apps]}
     
     # AUR packages
-    install_aur_packages swaylock-effects hyprpicker-git wlogout
+    # install_aur_packages swaylock-effects hyprpicker-git wlogout
+    install_aur_packages hyprpicker-git wlogout
 }
 
 create_hyprland_config() {
