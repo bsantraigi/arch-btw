@@ -1,43 +1,14 @@
 #!/bin/bash
-set -e
 
-# Hyprland-only post-install setup script
-
-echo "=== Arch Linux Hyprland Post-Install Setup ==="
-
-# Check if running on installed system vs chroot
-if [[ -f /.dockerenv ]] || [[ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/.)" ]]; then
-    echo "Running in chroot environment"
-    IN_CHROOT=true
-else
-    echo "Running on installed system"
-    IN_CHROOT=false
-fi
-
-# Source utility functions if available
-if [[ -f "lib/utils.sh" ]]; then
-    source lib/utils.sh
-elif [[ -f "../lib/utils.sh" ]]; then
-    source ../lib/utils.sh
-else
-    # Define basic functions if utils not available
-    print_info() { echo "ℹ $1"; }
-    print_step() { echo "→ $1"; }
-    print_success() { echo "✓ $1"; }
-    print_error() { echo "✗ $1"; }
-    confirm_operation() {
-        read -p "$1 [y/N]: " response
-        case "$response" in [Yy]|[Yy][Ee][Ss]) return 0;; *) return 1;; esac
-    }
-fi
+# Hyprland installation and setup functions
 
 install_yay() {
     if command -v yay &>/dev/null; then
-        print_info "yay already installed"
+        echo "yay already installed"
         return
     fi
     
-    print_step "Installing yay AUR helper..."
+    echo "Installing yay AUR helper..."
     
     # Create build user if running as root
     if [[ $EUID -eq 0 ]]; then
@@ -73,7 +44,7 @@ install_aur_packages() {
 }
 
 install_hyprland_core() {
-    print_step "Installing Hyprland core packages..."
+    echo "Installing Hyprland core packages..."
     
     # Core Hyprland ecosystem
     pacman -S --noconfirm \
@@ -86,7 +57,7 @@ install_hyprland_core() {
 }
 
 install_wayland_tools() {
-    print_step "Installing Wayland ecosystem tools..."
+    echo "Installing Wayland ecosystem tools..."
     
     # Status bar and launcher
     pacman -S --noconfirm \
@@ -129,19 +100,19 @@ install_wayland_tools() {
 }
 
 install_browsers() {
-    print_step "Installing browsers..."
+    echo "Installing browsers..."
     
     # Install AUR browsers
     install_aur_packages microsoft-edge-stable-bin brave-bin
 }
 
 install_development_tools() {
-    print_step "Installing development tools..."
+    echo "Installing development tools..."
     
     # VS Code and additional tools
     install_aur_packages visual-studio-code-bin
     
-    # Terminal file manager (yazi)
+    # Terminal file manager (yazi - if available in repos or AUR)
     if pacman -Ss yazi &>/dev/null; then
         pacman -S --noconfirm yazi
     else
@@ -150,7 +121,7 @@ install_development_tools() {
 }
 
 install_additional_tools() {
-    print_step "Installing additional tools..."
+    echo "Installing additional tools..."
     
     # AUR screenshot tool
     install_aur_packages grimblast-git
@@ -166,7 +137,7 @@ install_additional_tools() {
 }
 
 setup_polkit() {
-    print_step "Setting up polkit authentication..."
+    echo "Setting up polkit authentication..."
     
     # Create polkit configuration for VirtualBox
     mkdir -p /etc/polkit-1/rules.d
@@ -194,7 +165,7 @@ EOF
 }
 
 setup_locale() {
-    print_step "Setting up comprehensive locale support..."
+    echo "Setting up comprehensive locale support..."
     
     # Add locales
     cat >> /etc/locale.gen << 'EOF'
@@ -206,26 +177,16 @@ zh_CN.UTF-8 UTF-8
 EOF
     
     locale-gen
-    
-    # Only set locale if not in chroot
-    if [[ "$IN_CHROOT" == false ]]; then
-        localectl set-locale LANG=en_US.UTF-8
-    fi
+    localectl set-locale LANG=en_US.UTF-8
 }
 
 setup_timezone() {
-    print_step "Setting timezone to Asia/Kolkata..."
-    
-    # Only set timezone if not in chroot
-    if [[ "$IN_CHROOT" == false ]]; then
-        timedatectl set-timezone Asia/Kolkata
-    else
-        ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
-    fi
+    echo "Setting timezone to Asia/Kolkata..."
+    timedatectl set-timezone Asia/Kolkata
 }
 
 setup_fonts() {
-    print_step "Installing comprehensive font packages..."
+    echo "Installing comprehensive font packages..."
     
     # Base fonts
     pacman -S --noconfirm \
@@ -239,27 +200,24 @@ setup_fonts() {
         ttf-indic-otf
     
     # AUR fonts
-    print_info "Installing AUR font packages..."
+    echo "Installing AUR font packages..."
     install_aur_packages ttf-ms-fonts
 }
 
+enable_services() {
+    echo "Enabling essential services..."
+    
+    # Enable audio services
+    systemctl --user enable pipewire pipewire-pulse wireplumber
+    
+    # Enable polkit agent (will be started by Hyprland)
+    # This is handled in Hyprland config with exec-once
+}
+
 create_hyprland_config() {
-    print_step "Creating Hyprland configuration..."
+    local user_home="$1"
     
-    # Find the regular user (not root)
-    local target_user
-    if [[ $EUID -eq 0 ]]; then
-        # Find first user with home directory and UID >= 1000
-        target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1; exit}' /etc/passwd)
-        if [[ -z "$target_user" ]]; then
-            print_error "Could not find target user for configuration"
-            return 1
-        fi
-    else
-        target_user="$USER"
-    fi
-    
-    local user_home="/home/$target_user"
+    echo "Creating basic Hyprland configuration..."
     
     # Create config directory
     mkdir -p "$user_home/.config/hypr"
@@ -403,19 +361,19 @@ exec-once = /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 exec-once = wl-paste --watch cliphist store
 EOF
 
-    # Set ownership if running as root
-    if [[ $EUID -eq 0 ]]; then
-        chown -R $target_user:$target_user "$user_home/.config"
-    fi
-    
-    print_success "Hyprland configuration created for user: $target_user"
+    # Set ownership
+    chown -R $(stat -c %u:%g "$user_home") "$user_home/.config"
 }
 
-main() {
-    print_info "Starting Hyprland environment installation..."
+# Main Hyprland installation function
+install_hyprland_environment() {
+    local username="$1"
+    local user_home="/home/$username"
+    
+    print_step "Installing Hyprland Environment"
     
     # Update system first
-    print_step "Updating package database..."
+    print_info "Updating package database..."
     pacman -Sy
     
     # Install yay for AUR packages
@@ -430,172 +388,14 @@ main() {
     
     # System setup
     setup_locale
-    setup_timezone  
+    setup_timezone
     setup_fonts
     setup_polkit
+    enable_services
     
     # Create user configuration
-    create_hyprland_config
+    create_hyprland_config "$user_home"
     
     print_success "Hyprland environment installation completed!"
-    
-    if [[ "$IN_CHROOT" == true ]]; then
-        print_info "Installation completed in chroot environment"
-    else
-        print_info "Reboot and select Hyprland from the display manager"
-    fi
+    print_info "Reboot and select Hyprland from the display manager"
 }
-
-# Allow running as standalone script
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
-        if ! id -u builduser &>/dev/null; then
-            useradd -r -m -s /bin/bash builduser
-            echo "builduser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-        fi
-        
-        sudo -u builduser bash << 'EOF'
-cd /tmp
-git clone https://aur.archlinux.org/yay.git
-cd yay
-makepkg -si --noconfirm
-EOF
-    else
-        cd /tmp
-        git clone https://aur.archlinux.org/yay.git
-        cd yay
-        makepkg -si --noconfirm
-    fi
-    
-    rm -rf /tmp/yay
-}
-
-install_aur_packages() {
-    local packages=("$@")
-    
-    if [[ $EUID -eq 0 ]]; then
-        sudo -u builduser yay -S --noconfirm "${packages[@]}"
-    else
-        yay -S --noconfirm "${packages[@]}"
-    fi
-}
-
-install_gnome_minimal() {
-    echo "Installing GNOME minimal + essentials..."
-    
-    # Core GNOME
-    pacman -S --noconfirm \
-        gnome-shell gdm gnome-control-center gnome-tweaks \
-        nautilus gnome-terminal gnome-system-monitor \
-        gnome-calculator gnome-screenshot gnome-disk-utility \
-        file-roller evince eog gnome-text-editor \
-        gnome-settings-daemon gnome-session
-    
-    systemctl enable gdm
-    echo "GNOME minimal installed"
-}
-
-install_kde_minimal() {
-    echo "Installing KDE Plasma minimal + essentials..."
-    
-    # Core Plasma
-    pacman -S --noconfirm \
-        plasma-desktop plasma-workspace sddm \
-        dolphin konsole kate spectacle \
-        ark okular gwenview kcalc \
-        plasma-systemmonitor plasma-nm \
-        powerdevil bluedevil
-    
-    systemctl enable sddm
-    echo "KDE Plasma minimal installed"
-}
-
-install_gnome_full() {
-    echo "Installing GNOME full desktop..."
-    
-    pacman -S --noconfirm \
-        gnome gnome-extra gdm \
-        firefox nautilus-sendto \
-        file-roller evince
-    
-    systemctl enable gdm
-    echo "GNOME full installed"
-}
-
-install_kde_full() {
-    echo "Installing KDE Plasma full desktop..."
-    
-    pacman -S --noconfirm \
-        plasma-meta kde-applications-meta sddm \
-        firefox konsole dolphin kate gwenview \
-        okular spectacle ark
-    
-    systemctl enable sddm
-    echo "KDE Plasma full installed"
-}
-
-install_desktop() {
-    case "$DESKTOP_CHOICE" in
-        "1")
-            install_gnome_minimal
-            ;;
-        "2")
-            install_kde_minimal
-            ;;
-        "3")
-            install_gnome_full
-            ;;
-        "4")
-            install_kde_full
-            ;;
-        "skip")
-            echo "Skipping desktop installation"
-            ;;
-    esac
-}
-
-update_system() {
-    echo "Updating package database..."
-    pacman -Sy
-}
-
-main() {
-    echo "=== Arch Linux Post-Install Setup ==="
-    
-    # Check if running on installed system vs chroot
-    if [[ -f /.dockerenv ]] || [[ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/.)" ]]; then
-        echo "Running in chroot environment"
-        IN_CHROOT=true
-    else
-        echo "Running on installed system"
-        IN_CHROOT=false
-    fi
-    
-    get_desktop_choice
-    update_system
-    install_yay
-    setup_locale
-    
-    # Skip hardware-specific configs in chroot
-    if [[ "$IN_CHROOT" == false ]]; then
-        setup_timezone
-        setup_keyboard
-    fi
-    
-    install_essential_packages
-    install_fonts
-    install_aur_applications
-    install_desktop
-    
-    echo "Post-install setup complete!"
-    
-    if [[ "$DESKTOP_CHOICE" != "skip" ]]; then
-        echo "Reboot to start the desktop environment"
-    fi
-}
-
-# Allow running as standalone script
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi

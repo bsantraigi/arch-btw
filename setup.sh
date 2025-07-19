@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/lib/utils.sh"
 source "$SCRIPT_DIR/lib/state.sh"
 source "$SCRIPT_DIR/lib/partitions.sh"
 source "$SCRIPT_DIR/lib/install.sh"
+source "$SCRIPT_DIR/lib/hyprland.sh"
 
 # Global variables
 SCRIPT_MOUNTED=false
@@ -203,13 +204,62 @@ op_install_hyprland() {
         return 1
     fi
     
-    print_info "Hyprland installation functionality will be implemented in Phase 3"
-    print_info "This will replace the GNOME/KDE options with Hyprland-only setup"
+    # Check if we're in chroot or installed system
+    local in_chroot=false
+    if [[ -f /mnt/etc/hostname ]]; then
+        print_info "Detected installed system - will run in chroot"
+        in_chroot=true
+    fi
     
-    # TODO: Implement in Phase 3
-    # - Remove GNOME/KDE from post_install_script.sh
-    # - Add Hyprland package installation
-    # - Add Wayland ecosystem tools
+    if ! confirm_operation "Install Hyprland desktop environment?"; then
+        print_info "Operation cancelled"
+        return 0
+    fi
+    
+    print_info "Installing Hyprland environment..."
+    log_operation "Installing Hyprland desktop environment"
+    
+    if [[ "$in_chroot" == true ]]; then
+        # Running from live environment, install into /mnt
+        print_info "Installing Hyprland in chroot environment..."
+        
+        # Copy post-install script to chroot
+        cp "$SCRIPT_DIR/post_install_script.sh" /mnt/root/
+        chmod +x /mnt/root/post_install_script.sh
+        
+        # Run in chroot
+        if arch-chroot /mnt /root/post_install_script.sh; then
+            rm /mnt/root/post_install_script.sh
+            print_success "Hyprland installation completed!"
+            print_info "System is ready to reboot into Hyprland"
+        else
+            print_error "Hyprland installation failed"
+            return 1
+        fi
+    else
+        # Running on installed system
+        print_info "Installing Hyprland on live system..."
+        
+        # Find the target user
+        local target_user
+        if [[ $EUID -eq 0 ]]; then
+            target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1; exit}' /etc/passwd)
+            if [[ -z "$target_user" ]]; then
+                print_error "Could not find target user"
+                return 1
+            fi
+        else
+            target_user="$USER"
+        fi
+        
+        if install_hyprland_environment "$target_user"; then
+            print_success "Hyprland installation completed!"
+            print_info "Log out and select Hyprland from the display manager"
+        else
+            print_error "Hyprland installation failed"
+            return 1
+        fi
+    fi
 }
 
 op_deploy_dotfiles() {
