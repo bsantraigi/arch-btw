@@ -269,13 +269,71 @@ op_deploy_dotfiles() {
         return 1
     fi
     
-    print_info "Dotfiles deployment functionality will be implemented in Phase 4"
-    print_info "This will handle i3 → Hyprland config migration and deployment"
+    # Check if we're in chroot or installed system
+    local in_chroot=false
+    local dotfiles_path="/home"
     
-    # TODO: Implement in Phase 4
-    # - Create dotfiles repository structure
-    # - Implement config deployment
-    # - Add backup/restore functionality
+    if [[ -f /mnt/etc/hostname ]]; then
+        print_info "Detected installed system - will deploy in chroot"
+        in_chroot=true
+        dotfiles_path="/mnt/home"
+    fi
+    
+    # Find target user
+    local target_user
+    if [[ "$in_chroot" == true ]]; then
+        target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1}' /mnt/etc/passwd | head -1)
+    else
+        if [[ $EUID -eq 0 ]]; then
+            target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1; exit}' /etc/passwd)
+        else
+            target_user="$USER"
+        fi
+    fi
+    
+    if [[ -z "$target_user" ]]; then
+        print_error "Could not find target user"
+        return 1
+    fi
+    
+    local dotfiles_installer="$dotfiles_path/$target_user/dotfiles/dotfiles-install.sh"
+    
+    if [[ ! -f "$dotfiles_installer" ]]; then
+        print_error "Dotfiles installer not found at $dotfiles_installer"
+        print_info "Please ensure dotfiles are cloned to ~/dotfiles/"
+        return 1
+    fi
+    
+    if ! confirm_operation "Deploy dotfiles for user '$target_user'?"; then
+        print_info "Operation cancelled"
+        return 0
+    fi
+    
+    print_info "Deploying dotfiles..."
+    log_operation "Deploying dotfiles for user $target_user"
+    
+    if [[ "$in_chroot" == true ]]; then
+        # Deploy in chroot environment
+        arch-chroot /mnt bash -c "cd /home/$target_user/dotfiles && chmod +x dotfiles-install.sh && sudo -u $target_user ./dotfiles-install.sh install-no-backup"
+    else
+        # Deploy on live system
+        cd "$dotfiles_path/$target_user/dotfiles"
+        chmod +x dotfiles-install.sh
+        if [[ $EUID -eq 0 ]]; then
+            sudo -u "$target_user" ./dotfiles-install.sh install-no-backup
+        else
+            ./dotfiles-install.sh install-no-backup
+        fi
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+        print_success "Dotfiles deployment completed!"
+        print_info "Configuration files are now installed"
+        print_info "Log out and log back in for all changes to take effect"
+    else
+        print_error "Dotfiles deployment failed"
+        return 1
+    fi
 }
 
 op_system_info() {
