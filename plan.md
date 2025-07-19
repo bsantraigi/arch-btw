@@ -45,12 +45,14 @@ A comprehensive system setup tool for quick system replication with minimal user
 - [x] Migration documentation ✅ Phase 4B
 - [x] Contribution guidelines ✅ Phase 4B
 
-### Phase 5: Finalization & Polish 📋
+### Phase 5: Finalization & Polish ✅
 *See: `implementation_roadmap.md` for session-by-session breakdown*
-- [ ] Workspace configuration (kitty default, browser setup)
-- [ ] Vim keybindings for Hyprland (LDUR movement)
-- [ ] VirtualBox integration
-- [ ] Timeshift backup configuration
+- [x] Workspace configuration (kitty default, browser setup) ✅ Phase 5A
+- [x] Vim keybindings for Hyprland (LDUR movement) ✅ Phase 5A
+- [x] VirtualBox integration ✅ Phase 5A
+- [x] Timeshift backup configuration ✅ Phase 5A
+- [x] Enhanced HJKL keybinding scheme ✅ Phase 5A
+- [x] Complete menu system (11 operations) ✅ Phase 5A
 
 ## Menu Operations
 
@@ -63,7 +65,11 @@ A comprehensive system setup tool for quick system replication with minimal user
 4. Install Base OS + Software
 5. Install Hyprland + Essential Tools
 6. Deploy Dotfiles
-7. System Status/Info
+7. Setup VirtualBox + Root Access
+8. Setup Timeshift Backups
+9. Configure Workspace Defaults
+10. System Status & Info
+11. Exit
 
 ## Default Applications
 

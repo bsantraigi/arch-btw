@@ -36,8 +36,11 @@ show_main_menu() {
     echo "  4) Install Base OS + Software"
     echo "  5) Install Hyprland + Essential Tools"
     echo "  6) Deploy Dotfiles"
-    echo "  7) System Status & Info"
-    echo "  8) Exit"
+    echo "  7) Setup VirtualBox + Root Access"
+    echo "  8) Setup Timeshift Backups"
+    echo "  9) Configure Workspace Defaults"
+    echo " 10) System Status & Info"
+    echo " 11) Exit"
     echo
 }
 
@@ -45,14 +48,14 @@ show_main_menu() {
 get_menu_choice() {
     local choice
     while true; do
-        read -p "Choice [1-8]: " choice
+        read -p "Choice [1-11]: " choice
         case "$choice" in
-            [1-8])
+            [1-9]|1[01])
                 echo "$choice"
                 return 0
                 ;;
             *)
-                print_error "Invalid choice. Please select 1-8."
+                print_error "Invalid choice. Please select 1-11."
                 ;;
         esac
     done
@@ -336,6 +339,284 @@ op_deploy_dotfiles() {
     fi
 }
 
+op_setup_virtualbox() {
+    print_step "Setup VirtualBox + Root Access"
+    
+    if ! validate_state_for_operation "setup_virtualbox" "$(detect_system_state)"; then
+        return 1
+    fi
+    
+    # Check if we're in chroot or installed system
+    local in_chroot=false
+    local target_prefix=""
+    
+    if [[ -f /mnt/etc/hostname ]]; then
+        print_info "Detected installed system - will setup in chroot"
+        in_chroot=true
+        target_prefix="/mnt"
+    fi
+    
+    if ! confirm_operation "Setup VirtualBox with root access integration?"; then
+        print_info "Operation cancelled"
+        return 0
+    fi
+    
+    print_info "Installing VirtualBox and configuring root access..."
+    log_operation "Setting up VirtualBox with root access"
+    
+    if [[ "$in_chroot" == true ]]; then
+        # Install in chroot environment
+        print_info "Installing VirtualBox packages in chroot..."
+        
+        # Install VirtualBox
+        arch-chroot /mnt pacman -S --noconfirm virtualbox virtualbox-host-modules-arch
+        
+        # Add user to vboxusers group
+        local target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1}' /mnt/etc/passwd | head -1)
+        if [[ -n "$target_user" ]]; then
+            arch-chroot /mnt usermod -aG vboxusers "$target_user"
+            print_success "Added $target_user to vboxusers group"
+        fi
+        
+        # Enable VirtualBox kernel modules
+        arch-chroot /mnt bash -c "echo 'vboxdrv' >> /etc/modules-load.d/virtualbox.conf"
+        arch-chroot /mnt bash -c "echo 'vboxnetflt' >> /etc/modules-load.d/virtualbox.conf"
+        arch-chroot /mnt bash -c "echo 'vboxnetadp' >> /etc/modules-load.d/virtualbox.conf"
+        
+    else
+        # Install on live system
+        print_info "Installing VirtualBox packages..."
+        
+        # Install VirtualBox
+        pacman -S --noconfirm virtualbox virtualbox-host-modules-arch
+        
+        # Add current user to vboxusers group
+        local target_user="$USER"
+        if [[ $EUID -eq 0 ]]; then
+            target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1; exit}' /etc/passwd)
+        fi
+        
+        if [[ -n "$target_user" ]]; then
+            usermod -aG vboxusers "$target_user"
+            print_success "Added $target_user to vboxusers group"
+        fi
+        
+        # Load VirtualBox kernel modules
+        modprobe vboxdrv vboxnetflt vboxnetadp
+        
+        # Enable VirtualBox kernel modules
+        echo 'vboxdrv' >> /etc/modules-load.d/virtualbox.conf
+        echo 'vboxnetflt' >> /etc/modules-load.d/virtualbox.conf
+        echo 'vboxnetadp' >> /etc/modules-load.d/virtualbox.conf
+    fi
+    
+    print_success "VirtualBox installation completed!"
+    print_info "Root access integration is available via the VirtualBox Root desktop entry"
+    print_info "Reboot required to load VirtualBox kernel modules"
+}
+
+op_setup_timeshift() {
+    print_step "Setup Timeshift Backups"
+    
+    if ! validate_state_for_operation "setup_timeshift" "$(detect_system_state)"; then
+        return 1
+    fi
+    
+    # Check if we're in chroot or installed system
+    local in_chroot=false
+    
+    if [[ -f /mnt/etc/hostname ]]; then
+        print_info "Detected installed system - will setup in chroot"
+        in_chroot=true
+    fi
+    
+    if ! confirm_operation "Setup Timeshift backup system?"; then
+        print_info "Operation cancelled"
+        return 0
+    fi
+    
+    print_info "Installing and configuring Timeshift..."
+    log_operation "Setting up Timeshift backup system"
+    
+    if [[ "$in_chroot" == true ]]; then
+        # Install in chroot environment
+        print_info "Installing Timeshift in chroot..."
+        arch-chroot /mnt pacman -S --noconfirm timeshift
+        
+        # Check if timeshift partition exists
+        if lvs 2>/dev/null | grep -q timeshift; then
+            print_info "Timeshift LVM partition detected"
+            
+            # Create timeshift mount directory
+            arch-chroot /mnt mkdir -p /timeshift
+            
+            # Add to fstab
+            local timeshift_uuid=$(arch-chroot /mnt blkid -s UUID -o value /dev/vgcrypt/timeshift)
+            if [[ -n "$timeshift_uuid" ]]; then
+                echo "UUID=$timeshift_uuid /timeshift ext4 defaults 0 2" >> /mnt/etc/fstab
+                print_success "Added Timeshift partition to fstab"
+            fi
+            
+            # Mount timeshift partition
+            arch-chroot /mnt mount /timeshift
+            
+        else
+            print_warning "No dedicated Timeshift partition found"
+            print_info "Timeshift will use available space on root partition"
+        fi
+        
+    else
+        # Install on live system
+        print_info "Installing Timeshift..."
+        pacman -S --noconfirm timeshift
+        
+        # Check if timeshift partition exists and mount it
+        if lvs 2>/dev/null | grep -q timeshift; then
+            print_info "Timeshift LVM partition detected"
+            mkdir -p /timeshift
+            mount /dev/vgcrypt/timeshift /timeshift
+        fi
+    fi
+    
+    print_success "Timeshift installation completed!"
+    print_info "Configure Timeshift with: sudo timeshift-gtk"
+    print_info "Recommended: Set up automatic daily snapshots"
+    if lvs 2>/dev/null | grep -q timeshift; then
+        print_info "Dedicated Timeshift partition is available for snapshots"
+    fi
+}
+
+op_configure_workspace() {
+    print_step "Configure Workspace Defaults"
+    
+    if ! validate_state_for_operation "configure_workspace" "$(detect_system_state)"; then
+        return 1
+    fi
+    
+    # Check if we're in chroot or installed system
+    local in_chroot=false
+    local config_path="/home"
+    
+    if [[ -f /mnt/etc/hostname ]]; then
+        print_info "Detected installed system - will configure in chroot"
+        in_chroot=true
+        config_path="/mnt/home"
+    fi
+    
+    # Find target user
+    local target_user
+    if [[ "$in_chroot" == true ]]; then
+        target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1}' /mnt/etc/passwd | head -1)
+    else
+        if [[ $EUID -eq 0 ]]; then
+            target_user=$(awk -F: '$3 >= 1000 && $3 < 65534 && $6 ~ /^\/home/ {print $1; exit}' /etc/passwd)
+        else
+            target_user="$USER"
+        fi
+    fi
+    
+    if [[ -z "$target_user" ]]; then
+        print_error "Could not find target user"
+        return 1
+    fi
+    
+    if ! confirm_operation "Configure workspace defaults for user '$target_user'?"; then
+        print_info "Operation cancelled"
+        return 0
+    fi
+    
+    print_info "Configuring workspace defaults..."
+    log_operation "Configuring workspace defaults for user $target_user"
+    
+    # Create workspace configuration script
+    local workspace_script="$config_path/$target_user/.config/hypr/workspace-setup.sh"
+    
+    if [[ "$in_chroot" == true ]]; then
+        # Configure in chroot
+        arch-chroot /mnt mkdir -p "/home/$target_user/.config/hypr"
+        arch-chroot /mnt bash -c "cat > /home/$target_user/.config/hypr/workspace-setup.sh" << 'EOF'
+#!/bin/bash
+# Workspace default applications setup
+
+# Wait for Hyprland to be ready
+sleep 2
+
+# Launch default applications
+hyprctl dispatch workspace 1
+kitty &
+sleep 1
+
+hyprctl dispatch workspace 2
+microsoft-edge-stable &
+sleep 2
+
+# Return to workspace 1
+hyprctl dispatch workspace 1
+
+# Focus on terminal
+hyprctl dispatch focuswindow "kitty"
+EOF
+        
+        arch-chroot /mnt chmod +x "/home/$target_user/.config/hypr/workspace-setup.sh"
+        arch-chroot /mnt chown "$target_user:$target_user" "/home/$target_user/.config/hypr/workspace-setup.sh"
+        
+        # Add to Hyprland autostart
+        local hypr_config="/mnt/home/$target_user/.config/hypr/hyprland.conf"
+        if [[ -f "$hypr_config" ]]; then
+            echo "" >> "$hypr_config"
+            echo "# Workspace defaults" >> "$hypr_config"
+            echo "exec-once = ~/.config/hypr/workspace-setup.sh" >> "$hypr_config"
+            print_success "Added workspace setup to Hyprland autostart"
+        fi
+        
+    else
+        # Configure on live system
+        mkdir -p "$config_path/$target_user/.config/hypr"
+        
+        cat > "$workspace_script" << 'EOF'
+#!/bin/bash
+# Workspace default applications setup
+
+# Wait for Hyprland to be ready
+sleep 2
+
+# Launch default applications
+hyprctl dispatch workspace 1
+kitty &
+sleep 1
+
+hyprctl dispatch workspace 2
+microsoft-edge-stable &
+sleep 2
+
+# Return to workspace 1
+hyprctl dispatch workspace 1
+
+# Focus on terminal
+hyprctl dispatch focuswindow "kitty"
+EOF
+        
+        chmod +x "$workspace_script"
+        
+        if [[ $EUID -eq 0 ]]; then
+            chown "$target_user:$target_user" "$workspace_script"
+        fi
+        
+        # Add to Hyprland autostart
+        local hypr_config="$config_path/$target_user/.config/hypr/hyprland.conf"
+        if [[ -f "$hypr_config" ]]; then
+            echo "" >> "$hypr_config"
+            echo "# Workspace defaults" >> "$hypr_config"
+            echo "exec-once = ~/.config/hypr/workspace-setup.sh" >> "$hypr_config"
+            print_success "Added workspace setup to Hyprland autostart"
+        fi
+    fi
+    
+    print_success "Workspace configuration completed!"
+    print_info "Default layout: Workspace 1 (Terminal), Workspace 2 (Browser)"
+    print_info "Applications will auto-launch when Hyprland starts"
+}
+
 op_system_info() {
     print_step "System Status & Info"
     
@@ -406,9 +687,18 @@ main() {
                 op_deploy_dotfiles
                 ;;
             7)
-                op_system_info
+                op_setup_virtualbox
                 ;;
             8)
+                op_setup_timeshift
+                ;;
+            9)
+                op_configure_workspace
+                ;;
+            10)
+                op_system_info
+                ;;
+            11)
                 print_info "Exiting setup tool"
                 log_operation "Setup script exited normally"
                 exit 0

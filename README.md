@@ -44,13 +44,16 @@ bash install.sh
 ## Menu Operations
 
 1. **Setup Disk Partitions** - Create LUKS+LVM partition scheme
-2. **Install Base System** - Install Arch Linux base system with user creation
-3. **Install Hyprland** - Install complete Hyprland desktop environment
-4. **Setup Timeshift** - Configure system backup solution
-5. **Configure VirtualBox** - Setup VirtualBox with root access
-6. **View System Status** - Check installation state and system information
-7. **Deploy Dotfiles** - Install comprehensive Hyprland configuration files
-8. **Exit** - Exit the setup tool
+2. **Unmount Configuration** - Safely unmount encrypted filesystems
+3. **Remount Configuration** - Remount with password prompt for resume
+4. **Install Base System** - Install Arch Linux base system with user creation
+5. **Install Hyprland** - Install complete Hyprland desktop environment
+6. **Deploy Dotfiles** - Install comprehensive Hyprland configuration files
+7. **Setup VirtualBox** - Configure VirtualBox with root access integration
+8. **Setup Timeshift** - Configure automated backup system
+9. **Configure Workspace** - Set up default application layout
+10. **System Status** - Check installation state and system information
+11. **Exit** - Exit the setup tool
 
 ## Partition Schemes
 

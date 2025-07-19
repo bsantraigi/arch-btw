@@ -99,7 +99,7 @@ validate_state_for_operation() {
                 return 1
             fi
             ;;
-        "install_hyprland"|"deploy_dotfiles")
+        "install_hyprland"|"deploy_dotfiles"|"setup_virtualbox"|"setup_timeshift"|"configure_workspace")
             if [[ "$current_state" == "INSTALLED" ]]; then
                 return 0
             else
