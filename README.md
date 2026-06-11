@@ -4,20 +4,20 @@ A comprehensive, menu-driven Arch Linux installer with LUKS encryption, Hyprland
 
 ## Quick Start
 
-### Option 1: Interactive Menu System
+Run from the Arch Linux live environment:
+
 ```bash
-# Download and run from Arch Linux live environment
-curl -LO https://github.com/yourusername/arch-setup-tool/raw/main/setup.sh
-chmod +x setup.sh
-sudo ./setup.sh
+bash <(curl -sL https://github.com/bsantraigi/arch-btw/raw/main/install.sh)
 ```
 
-### Option 2: Direct Installation (Legacy)
+Or download first (useful for `bash -x` debugging):
+
 ```bash
-# Legacy single-script installation
-curl -LO https://github.com/yourusername/arch-setup-tool/raw/main/install.sh
-bash install.sh
+curl -LO https://github.com/bsantraigi/arch-btw/raw/main/install.sh
+bash -x install.sh
 ```
+
+The installer will offer to download and run the post-install script automatically.
 
 ## Features
 

@@ -200,15 +200,14 @@ copy_postinstall_script() {
     if [[ "$RUN_POSTINSTALL" == "y" ]]; then
         echo "Copying post-install script..."
         
-        # Download or copy post-install script
-        if [[ -f "post-install.sh" ]]; then
-            cp post-install.sh /mnt/root/
+        if [[ -f "post_install_script.sh" ]]; then
+            cp post_install_script.sh /mnt/root/post_install_script.sh
         else
-            echo "Warning: post-install.sh not found in current directory"
-            echo "You can run it manually after installation"
+            echo "Downloading post-install script..."
+            curl -Lo /mnt/root/post_install_script.sh https://github.com/bsantraigi/arch-btw/raw/main/post_install_script.sh
         fi
         
-        chmod +x /mnt/root/post-install.sh 2>/dev/null || true
+        chmod +x /mnt/root/post_install_script.sh
     fi
 }
 
@@ -264,9 +263,9 @@ grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
 
 # Run post-install if requested
-if [[ "$4" == "y" && -f /root/post-install.sh ]]; then
+if [[ "$4" == "y" && -f /root/post_install_script.sh ]]; then
     echo "Running post-install setup..."
-    /root/post-install.sh
+    /root/post_install_script.sh
 fi
 
 echo "Configuration complete!"
@@ -302,7 +301,7 @@ main() {
     if [[ "$RUN_POSTINSTALL" == "y" ]]; then
         echo "Post-install setup was run during installation."
     else
-        echo "To set up desktop environment later, run: sudo /root/post-install.sh"
+        echo "To set up desktop environment later, run: sudo /root/post_install_script.sh"
     fi
 }
 
