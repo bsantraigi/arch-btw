@@ -30,6 +30,14 @@ get_user_input() {
         exit 1
     fi
     
+    # Confirm disk selection
+    echo "WARNING: ALL data on $DISK will be destroyed!"
+    read -p "Type YES to confirm: " CONFIRM
+    if [[ "$CONFIRM" != "YES" ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+    
     print_schemes
     read -p "Partition scheme [1/2/3]: " SCHEME
     
@@ -39,10 +47,24 @@ get_user_input() {
     fi
     
     read -p "Admin username: " USERNAME
-    read -s -p "Encryption password: " CRYPT_PASS
-    echo
-    read -s -p "User password: " USER_PASS
-    echo
+    
+    while true; do
+        read -s -p "Encryption password: " CRYPT_PASS
+        echo
+        read -s -p "Confirm encryption password: " CRYPT_PASS2
+        echo
+        [[ "$CRYPT_PASS" == "$CRYPT_PASS2" ]] && break
+        echo "Passwords don't match. Try again."
+    done
+    
+    while true; do
+        read -s -p "User password: " USER_PASS
+        echo
+        read -s -p "Confirm user password: " USER_PASS2
+        echo
+        [[ "$USER_PASS" == "$USER_PASS2" ]] && break
+        echo "Passwords don't match. Try again."
+    done
     
     # Ask about post-install setup
     read -p "Run post-install setup (desktop/fonts/locale)? [y/n]: " RUN_POSTINSTALL
