@@ -21,162 +21,49 @@ bash install.sh
 
 ## Features
 
-### Core Installation
-- **Interactive Menu System**: Step-by-step guided installation
-- **LUKS + LVM Encryption**: Full disk encryption with logical volume management
-- **Flexible Partitioning**: Multiple schemes for different disk sizes (60GB-1TB+)
-- **State Management**: Resume installation from any point
-- **Error Recovery**: Robust error handling and recovery options
-
-### Desktop Environment
-- **Hyprland-Only Setup**: Modern Wayland compositor with LDUR keybindings
-- **Complete Wayland Stack**: Waybar, Rofi, Kitty, PipeWire integration
-- **No GNOME/KDE**: Lightweight, efficient desktop environment
-- **Microsoft Edge + Brave**: Modern browsers with AUR integration
-- **VirtualBox Integration**: Polkit-based root access support
-
-### Dotfiles System
-- **Comprehensive Configs**: Complete Hyprland, Waybar, Kitty configurations
-- **LDUR Keybinding Scheme**: Vim-style H/J/K/L directional navigation
-- **Backup Support**: Automatic backup of existing configurations
-- **Standalone Installation**: Can be used independently of main installer
-
-## Menu Operations
-
-1. **Setup Disk Partitions** - Create LUKS+LVM partition scheme
-2. **Unmount Configuration** - Safely unmount encrypted filesystems
-3. **Remount Configuration** - Remount with password prompt for resume
-4. **Install Base System** - Install Arch Linux base system with user creation
-5. **Install Hyprland** - Install complete Hyprland desktop environment
-6. **Deploy Dotfiles** - Install comprehensive Hyprland configuration files
-7. **Setup VirtualBox** - Configure VirtualBox with root access integration
-8. **Setup Timeshift** - Configure automated backup system
-9. **Configure Workspace** - Set up default application layout
-10. **System Status** - Check installation state and system information
-11. **Exit** - Exit the setup tool
+- Automated end-to-end Arch Linux installation
+- LUKS encryption + LVM setup
+- Configurable partition schemes for different disk sizes
+- Timeshift integration for system backups (except for compact scheme)
+- Works on both VMs and bare metal
+- Post-install script with desktop environments (GNOME, KDE, i3wm), PipeWire audio, LibreOffice, LightDM
 
 ## Partition Schemes
 
-### Compact (60-100GB)
-- **Target**: Small SSDs, VMs
-- **Layout**: 8GB swap, 40GB root, rest for home
-- **Features**: No Timeshift (space constraints)
+* compact: For 60-100GB disks: 8GB swap, rest for root (no /home, no timeshift)
+* standard: For 512GB disks: 16GB swap, 150GB root, 200GB home, rest for timeshift
+* massive: For 1TB+ disks: 16GB swap, 200GB root, rest split between home and timeshift
 
-### Standard (250-512GB)
-- **Target**: Standard laptops/desktops
-- **Layout**: 16GB swap, 150GB root, 200GB home, rest for Timeshift
-- **Features**: Full backup support
+## Partition Layout
 
-### Massive (1TB+)
-- **Target**: Large storage systems
-- **Layout**: 16GB swap, 200GB root, balanced home/Timeshift split
-- **Features**: Extended backup retention
+The script creates:
 
-## Partition Layout Details
+* efi: 1GiB partition (FAT32)
+* boot: 5GiB partition (ext4)
+* LVM on LUKS container with:
+  * swap: 8GB or 16GB
+  * root: 100%FREE (compact), 150GB (standard), or 200GB (massive)
+  * home: Remaining LVM space (standard/massive only)
+* Timeshift partition (for standard/massive schemes)
 
-All schemes create:
-- **EFI**: 1GB (FAT32) - UEFI boot partition
-- **Boot**: 5GB (ext4) - Kernel and initramfs storage
-- **LUKS Container**: Remainder of disk containing LVM with:
-  - **Swap**: 8-16GB logical volume
-  - **Root**: 40-200GB logical volume
-  - **Home**: User data storage
-  - **Timeshift**: Backup storage (standard/massive only)
+## Post-Install
 
-## LDUR Keybinding Scheme
-
-The dotfiles implement a consistent LDUR (Left, Down, Up, Right) navigation scheme:
-
-### Window Management
-- `Super + H/J/K/L` - Focus left/down/up/right
-- `Super + Shift + H/J/K/L` - Move windows
-- `Super + Ctrl + H/J/K/L` - Resize windows
-
-### Applications
-- `Super + Return` - Terminal (Kitty)
-- `Super + R` - Launcher (Rofi)
-- `Super + E` - File manager
-- `Super + B` - Browser (Edge)
-
-### System
-- `Super + Q` - Close window
-- `Super + M` - Exit Hyprland
-- `Super + L` - Lock screen
-- `Print` - Screenshot
-
-## Repository Structure
-
-```
-arch-setup-tool/
-├── setup.sh              # Main menu-driven installer
-├── install.sh             # Legacy direct installer
-├── post_install_script.sh # Hyprland environment installer
-├── reset.sh               # System reset utility
-├── lib/                   # Modular installation libraries
-│   ├── state.sh           # System state detection
-│   ├── utils.sh           # Utilities and colors
-│   ├── partitions.sh      # Partition management
-│   ├── install.sh         # Base system installation
-│   └── hyprland.sh        # Hyprland installation
-└── dotfiles/              # Complete Hyprland configuration
-    ├── hypr/              # Hyprland window manager config
-    ├── waybar/            # Status bar configuration
-    ├── kitty/             # Terminal configuration
-    ├── rofi/              # Application launcher
-    ├── vim/               # Vim editor configuration
-    ├── shell/             # Shell aliases and functions
-    ├── applications/      # Desktop application entries
-    ├── scripts/           # Utility scripts
-    └── dotfiles-install.sh # Standalone dotfiles installer
-```
+Run `post_install_script.sh` on the installed system to set up:
+- Desktop environment (GNOME minimal/full, KDE minimal/full, or i3wm)
+- PipeWire audio stack
+- LibreOffice
+- LightDM display manager (supports X11 + Wayland sessions)
+- Fonts (international + CJK + Indic)
+- AUR apps via yay (browsers, VS Code, etc.)
 
 ## Requirements
 
-- **Boot Environment**: Arch Linux live ISO
-- **Internet**: Active connection for package downloads
-- **Storage**: 60GB minimum (250GB+ recommended)
-- **Architecture**: x86_64 UEFI systems
-- **Memory**: 2GB+ RAM (4GB+ recommended)
+* Arch Linux live ISO
+* Internet connection
+* Single disk with sufficient space
 
-## Advanced Usage
+## Usage Notes
 
-### State Management
-The installer tracks system state and allows resuming from interruption:
-- `CLEAN` - Fresh system, ready for partitioning
-- `PARTITIONED` - Disks ready, can install base system
-- `MOUNTED` - Partitions mounted, ready for installation
-- `INSTALLED` - Base system ready for desktop environment
-
-### Custom Configuration
-- Edit `lib/` modules for custom installation behavior
-- Modify `dotfiles/` for personalized configurations
-- Use `setup.sh` operations individually as needed
-
-### Debugging
-```bash
-# Enable debug output
-bash -x setup.sh
-
-# Check system state
-./setup.sh # Use operation 6 for system info
-
-# View logs
-journalctl -f
-```
-
-## Contributing
-
-1. Fork the repository
-2. Test changes in virtual machine
-3. Document modifications
-4. Submit pull request
-
-## License
-
-This project is provided as-is for educational and personal use. Feel free to modify and distribute according to your needs.
-
-## Credits
-
-- Arch Linux community for excellent documentation
-- Hyprland developers for the modern Wayland compositor
-- Contributors to Waybar, Kitty, and other essential tools
+* Run from Arch live ISO environment
+* Script requires root privileges
+* Will completely erase the target disk
