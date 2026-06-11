@@ -20,12 +20,19 @@ print_desktops() {
 
 get_desktop_choice() {
     print_desktops
-    read -p "Choose desktop [1/2/3/4/5/skip]: " DESKTOP_CHOICE
+    echo "  You can select multiple (e.g., 1 3 5)"
+    read -p "Choose desktop(s) [1/2/3/4/5/skip]: " DESKTOP_CHOICE
     
-    if [[ ! "$DESKTOP_CHOICE" =~ ^[1-5]$|^skip$ ]]; then
-        echo "Invalid choice"
-        exit 1
+    if [[ "$DESKTOP_CHOICE" == "skip" ]]; then
+        return
     fi
+    
+    for choice in $DESKTOP_CHOICE; do
+        if [[ ! "$choice" =~ ^[1-5]$ ]]; then
+            echo "Invalid choice: $choice"
+            exit 1
+        fi
+    done
 }
 
 setup_locale() {
@@ -216,26 +223,20 @@ harden_root() {
 }
 
 install_desktop() {
-    case "$DESKTOP_CHOICE" in
-        "1")
-            install_gnome_minimal
-            ;;
-        "2")
-            install_kde_minimal
-            ;;
-        "3")
-            install_gnome_full
-            ;;
-        "4")
-            install_kde_full
-            ;;
-        "5")
-            install_i3wm
-            ;;
-        "skip")
-            echo "Skipping desktop installation"
-            ;;
-    esac
+    if [[ "$DESKTOP_CHOICE" == "skip" ]]; then
+        echo "Skipping desktop installation"
+        return
+    fi
+    
+    for choice in $DESKTOP_CHOICE; do
+        case "$choice" in
+            "1") install_gnome_minimal ;;
+            "2") install_kde_minimal ;;
+            "3") install_gnome_full ;;
+            "4") install_kde_full ;;
+            "5") install_i3wm ;;
+        esac
+    done
 }
 
 install_display_manager() {
