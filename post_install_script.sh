@@ -220,6 +220,12 @@ install_office() {
 harden_root() {
     echo "Locking root account (use sudo instead)..."
     passwd -l root
+    
+    # Remove builduser used for AUR installs
+    if id -u builduser &>/dev/null; then
+        userdel -r builduser 2>/dev/null || true
+        sed -i '/^builduser /d' /etc/sudoers
+    fi
 }
 
 install_desktop() {
