@@ -1,0 +1,23 @@
+# TODO
+
+- switch vim with neovim
+- common aliases setup
+    - vim, vi = neovim
+    - ll etc.
+- bash PS1 setup
+- add htop btop 
+- install vboxadditions in case of VirtualBox
+- vimrc
+    - nu
+    - rnu
+    - 4 spaces for tabs
+    - syntax on
+    - set tabstop=4
+    - set shiftwidth=4
+    - set expandtab
+    - set autoindent
+
+Timeshift:
+D - 7
+M - 6
+Y - 2

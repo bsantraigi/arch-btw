@@ -1,30 +1,31 @@
----
-applyTo: '**'
----
 # Personal Coding Style Preferences
 
 ## Core Principles
 - Keep code minimal and compact - avoid bloated solutions
-- Focus only on the task at hand, no unnecessary features and changes
-- Do minimal and optimal changes to existing code
-- Use clear, concise variable and function names
 - Don't over-document - only document absolute necessary bits using very few words
 - I can understand obvious things myself, skip explaining the basics
+- Make code modular with functions for repetitive tasks
 - Complete tasks in phases to help with debugging
+- Refactor common bits and pieces into reusable functions
 
 ## Code Structure
 - Automate everything end-to-end with minimal user prompts
 - Use clear, descriptive function names
 - Group related functionality together
+- Design scripts to work in multiple environments (VMs, bare metal, existing systems)
 - Don't change existing functionality much when adding features
-- Make code modular with functions for repetitive tasks
-- Refactor common bits and pieces into reusable functions
 
 ## Documentation Style
 - Very brief comments only for non-obvious parts
 - No verbose explanations of standard operations
 - Focus on why, not what (when commenting at all)
 - Use concise variable/function names that are self-explanatory
+
+## System Preferences
+- Arch Linux user with specific system requirements
+- Prefer command-line tools and automation
+- LUKS on LVM setup preference
+- Modular approach for different use cases (VM/bare metal)
 
 ## Communication Style
 - Direct and to-the-point
