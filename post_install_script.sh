@@ -1,7 +1,15 @@
 #!/bin/bash
 set -e
 
-# Hyprland-only post-install setup script
+# Desktop environments
+declare -A desktops=(
+    [1]="GNOME (minimal + essentials)"
+    [2]="KDE Plasma (minimal + essentials)"
+    [3]="GNOME (full)"
+    [4]="KDE Plasma (full)"
+    [5]="i3wm (minimal + essentials)"
+    [skip]="Skip desktop installation"
+)
 
 echo "=== Arch Linux Hyprland Post-Install Setup ==="
 
@@ -62,13 +70,13 @@ EOF
     rm -rf /tmp/yay
 }
 
-install_aur_packages() {
-    local packages=("$@")
+get_desktop_choice() {
+    print_desktops
+    read -p "Choose desktop [1/2/3/4/5/skip]: " DESKTOP_CHOICE
     
-    if [[ $EUID -eq 0 ]]; then
-        sudo -u builduser yay -S --noconfirm "${packages[@]}"
-    else
-        yay -S --noconfirm "${packages[@]}"
+    if [[ ! "$DESKTOP_CHOICE" =~ ^[1-5]$|^skip$ ]]; then
+        echo "Invalid choice"
+        exit 1
     fi
 }
 
@@ -486,13 +494,12 @@ install_gnome_minimal() {
     
     # Core GNOME
     pacman -S --noconfirm \
-        gnome-shell gdm gnome-control-center gnome-tweaks \
+        gnome-shell gnome-control-center gnome-tweaks \
         nautilus gnome-terminal gnome-system-monitor \
         gnome-calculator gnome-screenshot gnome-disk-utility \
         file-roller evince eog gnome-text-editor \
         gnome-settings-daemon gnome-session
     
-    systemctl enable gdm
     echo "GNOME minimal installed"
 }
 
@@ -501,13 +508,12 @@ install_kde_minimal() {
     
     # Core Plasma
     pacman -S --noconfirm \
-        plasma-desktop plasma-workspace sddm \
+        plasma-desktop plasma-workspace \
         dolphin konsole kate spectacle \
         ark okular gwenview kcalc \
         plasma-systemmonitor plasma-nm \
         powerdevil bluedevil
     
-    systemctl enable sddm
     echo "KDE Plasma minimal installed"
 }
 
@@ -515,11 +521,10 @@ install_gnome_full() {
     echo "Installing GNOME full desktop..."
     
     pacman -S --noconfirm \
-        gnome gnome-extra gdm \
+        gnome gnome-extra \
         firefox nautilus-sendto \
         file-roller evince
     
-    systemctl enable gdm
     echo "GNOME full installed"
 }
 
@@ -527,12 +532,43 @@ install_kde_full() {
     echo "Installing KDE Plasma full desktop..."
     
     pacman -S --noconfirm \
-        plasma-meta kde-applications-meta sddm \
+        plasma-meta kde-applications-meta \
         firefox konsole dolphin kate gwenview \
         okular spectacle ark
     
-    systemctl enable sddm
     echo "KDE Plasma full installed"
+}
+
+install_i3wm() {
+    echo "Installing i3wm + essentials..."
+    
+    pacman -S --noconfirm \
+        i3-wm i3status i3lock dmenu rofi picom feh \
+        xorg-server xorg-xinit xorg-xrandr \
+        kitty thunar xfce4-terminal \
+        lxappearance papirus-icon-theme \
+        xss-lock dunst libnotify
+    
+    echo "i3wm installed"
+}
+
+install_audio() {
+    echo "Installing audio stack (PipeWire)..."
+    
+    pacman -S --noconfirm \
+        pipewire pipewire-pulse pipewire-alsa wireplumber \
+        pavucontrol
+}
+
+install_office() {
+    echo "Installing office suite..."
+    
+    pacman -S --noconfirm libreoffice-fresh
+}
+
+harden_root() {
+    echo "Locking root account (use sudo instead)..."
+    passwd -l root
 }
 
 install_desktop() {
@@ -549,10 +585,26 @@ install_desktop() {
         "4")
             install_kde_full
             ;;
+        "5")
+            install_i3wm
+            ;;
         "skip")
             echo "Skipping desktop installation"
             ;;
     esac
+}
+
+install_display_manager() {
+    [[ "$DESKTOP_CHOICE" == "skip" ]] && return
+    
+    echo "Installing LightDM display manager..."
+    pacman -S --noconfirm lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings
+    
+    # Ensure LightDM picks up both X11 and Wayland sessions
+    sed -i 's|^#sessions-directory=.*|sessions-directory=/usr/share/lightdm/sessions:/usr/share/xsessions:/usr/share/wayland-sessions|' /etc/lightdm/lightdm.conf
+    
+    systemctl enable lightdm
+    echo "LightDM enabled — will start on next boot"
 }
 
 update_system() {
@@ -584,9 +636,13 @@ main() {
     fi
     
     install_essential_packages
+    install_audio
     install_fonts
+    install_office
     install_aur_applications
     install_desktop
+    install_display_manager
+    harden_root
     
     echo "Post-install setup complete!"
     
